@@ -3,7 +3,7 @@ import Foundation
 let arguments = CommandLine.arguments
 
 guard arguments.count == 5 else {
-    print("Использование: interpreter.swift <программа.bin> <дамп.json> <начало> <конец>")
+    print("Использование: ./interpret.sh <программа.bin> <дамп.json> <начало> <конец>")
     exit(1)
 }
 
@@ -64,14 +64,34 @@ while offset < bytes.count {
 
     switch opcode {
     case 0:
-        accumulator = argument
+        let signBit = 1 << (format.operandBits - 1)
+        if argument >= signBit {
+            accumulator = argument - (signBit << 1)
+        } else {
+            accumulator = argument
+        }
+
     case 2:
         let address = accumulator + argument
+        guard address >= 0 else {
+            print("Байт \(offset): READ получил отрицательный адрес \(address)")
+            exit(1)
+        }
         accumulator = memory[address, default: 0]
+
     case 6:
         memory[argument] = accumulator
+
+    case 1:
+        guard accumulator >= 0 else {
+            print("Байт \(offset): SGN получил отрицательный адрес результата \(accumulator)")
+            exit(1)
+        }
+        let value = memory[argument, default: 0]
+        memory[accumulator] = value.signum()
+
     default:
-        print("Команда \(format.name) будет реализована на этапе 4")
+        print("Байт \(offset): неизвестный код операции \(opcode)")
         exit(1)
     }
 
